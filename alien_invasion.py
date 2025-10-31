@@ -5,6 +5,7 @@ import pygame
 
 from settings import Settings
 from game_stats import GameStats
+from scoreboard import Scoreboard
 from button import Button
 from ship import Ship
 from bullet import Bullet
@@ -29,8 +30,10 @@ class AlienInvasion:
         #window_title
         pygame.display.set_caption("Alien Invasion")
 
-        # Создание экземпляра для хранения игровой статистики.
+        # Создание экземпляра для хранения игровой статистики
+        # и панели результатов.
         self.stats = GameStats(self)
+        self.sb = Scoreboard(self)
 
         #game_objects
         self.ship = Ship(self)
@@ -99,10 +102,15 @@ class AlienInvasion:
         """Запускает новую игру при нажатии кнопки PLAY"""
         button_clicked = self.play_button.rect.collidepoint(mouse_pos)
         if button_clicked and not self.stats.game_active:
+            #Сброс игровых настроек
+            self.settings.initialize_dinamic_settings()
             #Сброс статистики предыдущей игры
             self.stats.reset_stats()
             self.stats.game_active = True
-
+            self.sb.prep_score() 
+            self.sb.prep_level()
+            self.sb.prep_ships()
+ 
             #Скрытие указателя мыши
             pygame.mouse.set_visible(False)
 
@@ -160,10 +168,21 @@ class AlienInvasion:
         # При обнаружении попадания удалить снаряд и пришельца.
         collisions = pygame.sprite.groupcollide(self.bullets, self.aliens, True, True)
 
+        if collisions:
+            for aliens in collisions.values():
+                self.stats.score += self.settings.aliens_points * len(aliens)
+            self.sb.prep_score()
+            self.sb.check_high_score() 
+
         if not self.aliens:
             # Уничтожение существующих снарядов и создание нового флота.
             self.bullets.empty()
+            self.settings.increase_speed()
             self._create_fleet()
+
+            #Увеличение уровня.
+            self.stats.level += 1
+            self.sb.prep_level()
 
     def _check_fleet_edges(self):
         """Реагирует на достижение пришельцем края экрана."""
@@ -204,6 +223,7 @@ class AlienInvasion:
         if self.stats.ships_left > 0:
             # Уменьшение ships_left
             self.stats.ships_left -= 1
+            self.sb.prep_ships()
 
             # Очистка списков пришельцев и снарядов
             self.aliens.empty()
@@ -226,6 +246,9 @@ class AlienInvasion:
         for bullet in self.bullets.sprites():
             bullet.draw_bullet()
         self.aliens.draw(self.screen)
+
+        #Вывод Scoreboard
+        self.sb.show_score()
 
         # Кнопка Play отображается в том случае, если игра неактивна
         if not self.stats.game_active:
